@@ -37,4 +37,8 @@
     "rewrap.wrappingColumn": 88,
     "debug.allowBreakpointsEverywhere": true,
     "debugpy.debugJustMyCode": false,
+    "workbench.editorAssociations": {
+        "{git,gitlens,conflictResolution,vscode-local-history}:/**/*.tc.json": "default",
+        "{git,gitlens,conflictResolution,vscode-local-history}:/**/*.{asl.json,asl.yaml,asl.yml}": "default"
+    },
 }
