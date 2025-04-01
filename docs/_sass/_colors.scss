@@ -1,0 +1,28 @@
+// Colours
+$bodyColour: #0e0e0d;
+$headingColour: darken($bodyColour, 5%);
+$linkColour: #5B5BFF;
+$hoverColour: darken($linkColour, 10%);
+$captionColour: lighten($headingColour, 40%);
+$white: #fff;
+
+$backgroundColour: #ffffff;
+$codeBackgroundColour: darken($backgroundColour, 5%);
+
+// // Override the typeface settings
+// $bodytype: (
+//     font-family: 'Georgia, serif',
+//     // Change to your preferred body font
+//     regular: 400,
+//     bold: 700,
+//     italic: italic,
+//     cap-height: 0.66 // Use 0.66 for Georgia, adjust for other fonts
+// );
+
+// $headingtype: (
+//     font-family: '"Helvetica Neue", Arial, sans-serif',
+//     // Change to your preferred heading font
+//     regular: 400,
+//     bold: 700,
+//     cap-height: 0.66 // Adjust based on your heading font
+//     ) !default;

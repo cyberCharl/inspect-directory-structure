@@ -1,0 +1,12 @@
+# An example docker compose file that uses multiple containers. In this instance, the web_browser tools are run in a separate sandbox, with a public image.
+
+services:
+  default:
+    build: .
+    command: tail -f /dev/null
+    cpus: 1.0
+    mem_limit: 0.5gb
+    network_mode: bridge
+  web_browser:
+    image: "inspect_web_browser"
+    init: true

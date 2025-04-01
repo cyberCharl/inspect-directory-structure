@@ -1,0 +1,12 @@
+{
+    "evaluation_name": "web_multihop_question_answering",
+    "evaluation_authors": ["Sid Black"],
+    "parent_tasks": [],
+    "subtasks": [],
+    "estimated_expert_completion_time": 0.5,
+    "domains": ["Web Browsing", "Question Answering", "MultiHop Reasoning"],
+    "requires_sandbox": true,
+    "release_status": "public",
+    "requires_internet_access": true,
+    "requires_file_access": false
+}

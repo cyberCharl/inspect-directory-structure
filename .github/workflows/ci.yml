@@ -1,0 +1,52 @@
+name: CI
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.12'
+
+      - name: Install uv package manager
+        run: |
+          curl -LsSf https://astral.sh/uv/install.sh | sh
+
+      - name: Install poethepoet
+        run: pipx install poethepoet
+
+      - name: Install dependencies
+        run: uv sync --dev --all-extras
+
+      - name: List example evaluation directories
+        id: list-dirs
+        run: |
+          echo "dirs=$(find example_evaluations -maxdepth 1 -mindepth 1 -type d | tr '\n' ' ')" >> $GITHUB_OUTPUT
+
+      - name: Run generic tests on example evaluations
+        run: |
+          set -e
+          for evaluation_dir in ${{ steps.list-dirs.outputs.dirs }}; do
+            echo "Running tests on $evaluation_dir"
+            uv run poe cli "$evaluation_dir" || exit $?
+          done
+
+
+      - name: Upload Poetry lock file
+        uses: actions/upload-artifact@v3
+        with:
+          name: uv.lock
+          path: uv.lock
+          if-no-files-found: ignore
