@@ -3,6 +3,7 @@
 The only mandatory part of this template is to define a `@task` function for each evaluation variant/category you want to create. The rest of the code / structure is optional, but we recommend you use it as a guide.
 """
 
+import os
 from hashlib import sha256
 from pathlib import Path
 
@@ -24,6 +25,8 @@ from inspect_ai.solver import (  # Plan, generate, use_tools
 )
 from inspect_ai.tool import bash, python
 from inspect_ai.util import sandbox
+
+from . import scorer_helper
 
 NEW_PROMPT = """Your objective is to generate a nested directory hierarchy according to the rules specified below.
 
@@ -68,10 +71,7 @@ def hash_string(data: str) -> str:
 
 def create_directory_sample(n: int) -> Sample:
     prompt = NEW_PROMPT.format(n=n)
-    return Sample(
-        id=hash_string(prompt),
-        input=prompt,
-    )
+    return Sample(id=hash_string(prompt), input=prompt, target=str(n))
 
 
 def create_dataset(num_samples: int) -> list[Sample]:
@@ -92,7 +92,7 @@ def default_solver() -> Solver:
 
 
 @scorer(metrics=[accuracy()])
-def my_scorer():
+def old_scorer():
     async def score(state: TaskState, target: Target) -> Score:
         # There are predefined scorers in inspect_ai.scorer which might be more appropriate for this task, but we define a custom one here for illustrative purposes. In practice, you would want to use something like inspect's built-in `exact()` scorer which does this plus some extra normalization.
 
@@ -110,6 +110,64 @@ def my_scorer():
     return score
 
 
+@scorer(metrics=[accuracy()])
+def directory_scorer():
+    async def check_directory_structure(state: TaskState, target: Target) -> Score:
+        """Checks if the agent created the correct directory structure."""
+        expected_n = int(target.text)
+        if expected_n is None:
+            return Score(value=0.0, explanation="Task metadata missing 'n'.")
+        if not isinstance(expected_n, int) or expected_n < 1:
+            return Score(value=0.0, explanation=f"Invalid 'n' value: {expected_n}.")
+
+        try:
+            base_output_path = Path("home/agent/output")
+
+            if not base_output_path.is_dir():
+                return Score(
+                    value=0.0,
+                    explanation=f"Base output directory '{base_output_path}' not found or not a directory.",
+                )
+
+            max_depth_found = -1
+            structure_correct = True
+            explanation = "Checks passed."  # Default success message
+
+            base_path_str = os.path.normpath(str(base_output_path))
+            base_path_len = len(base_path_str.split(os.sep))
+
+            structure_correct, max_depth_found, explanation = (
+                scorer_helper.check_directory_structure_walk(
+                    base_output_path,
+                    base_path_str,
+                    base_path_len,
+                    expected_n,
+                    max_depth_found,
+                )
+            )
+
+            # Final checks after walk (if no error broke the loop)
+            if structure_correct:
+                # Handle cases where nothing was created or structure is too shallow
+                if max_depth_found == -1 and expected_n > 0:  # Nothing created at all
+                    structure_correct = False
+                    explanation = f"No directories created, expected structure up to depth {expected_n}."
+                elif max_depth_found != expected_n:
+                    structure_correct = False
+                    explanation = f"Incorrect final depth: Max depth found is {max_depth_found}, expected {expected_n}."
+
+            final_score_value = 1.0 if structure_correct else 0.0
+            return Score(value=final_score_value, explanation=explanation)
+
+        except Exception as e:
+            # Catch potential errors during filesystem access
+            return Score(
+                value=0.0, explanation=f"Scoring error: {type(e).__name__}: {e}"
+            )
+
+    return check_directory_structure
+
+
 def _create_task(
     solver: Solver | None = None,
     num_samples: int = 2,
@@ -117,7 +175,7 @@ def _create_task(
     solver = solver or default_solver()
     return Task(
         dataset=create_dataset(num_samples=num_samples),
-        scorer=my_scorer(),
+        scorer=directory_scorer(),
         sandbox=("docker", str(Path(__file__).parent / "compose.yaml")),
         solver=solver,
         message_limit=5,
