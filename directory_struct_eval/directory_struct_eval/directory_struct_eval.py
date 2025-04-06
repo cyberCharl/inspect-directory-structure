@@ -3,11 +3,9 @@
 The only mandatory part of this template is to define a `@task` function for each evaluation variant/category you want to create. The rest of the code / structure is optional, but we recommend you use it as a guide.
 """
 
-import os
 from hashlib import sha256
 from pathlib import Path
 
-import scorer_helper
 from dotenv import load_dotenv
 from inspect_ai import Task, task
 from inspect_ai.dataset import Sample
@@ -107,58 +105,6 @@ def old_scorer():
         return Score(value=CORRECT, explanation=output.stdout)
 
     return score
-
-
-@scorer(metrics=[accuracy()])
-def directory_scorer():
-    async def check_directory_structure(state: TaskState, target: Target) -> Score:
-        """Checks if the agent created the correct directory structure."""
-        expected_n = int(target.text)
-        if expected_n is None:
-            return Score(value=0.0, explanation="Task metadata missing 'n'.")
-        if not isinstance(expected_n, int) or expected_n < 1:
-            return Score(value=0.0, explanation=f"Invalid 'n' value: {expected_n}.")
-
-        try:
-            base_output_path = Path("/home/agent/output")
-
-            max_depth_found = -1
-            structure_correct = True
-            explanation = "Checks passed."  # Default success message
-
-            base_path_str = os.path.normpath(str(base_output_path))
-            base_path_len = len(base_path_str.split(os.sep))
-
-            structure_correct, max_depth_found, explanation = (
-                scorer_helper.check_directory_structure_walk(
-                    base_output_path,
-                    base_path_str,
-                    base_path_len,
-                    expected_n,
-                    max_depth_found,
-                )
-            )
-
-            # Final checks after walk (if no error broke the loop)
-            if structure_correct:
-                # Handle cases where nothing was created or structure is too shallow
-                if max_depth_found == -1 and expected_n > 0:  # Nothing created at all
-                    structure_correct = False
-                    explanation = f"No directories created, expected structure up to depth {expected_n}."
-                elif max_depth_found != expected_n:
-                    structure_correct = False
-                    explanation = f"Incorrect final depth: Max depth found is {max_depth_found}, expected {expected_n}."
-
-            final_score_value = 1.0 if structure_correct else 0.0
-            return Score(value=final_score_value, explanation=explanation)
-
-        except Exception as e:
-            # Catch potential errors during filesystem access
-            return Score(
-                value=0.0, explanation=f"Scoring error: {type(e).__name__}: {e}"
-            )
-
-    return check_directory_structure
 
 
 def _create_task(
