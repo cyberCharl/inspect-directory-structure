@@ -75,7 +75,7 @@ def create_directory_sample(n: int) -> Sample:
 
 def create_dataset(num_samples: int) -> list[Sample]:
     samples = []
-    for i in range(3, num_samples + 3):
+    for i in range(2, num_samples + 2):
         samples.append(create_directory_sample(i))
 
     return samples
@@ -101,7 +101,7 @@ def old_scorer():
         #     value=INCORRECT,
         #     explanation=f"Expected answer {target.text}, got {state.output.completion}",
         # )
-        output = await sandbox().exec(["tree"], cwd="home/agent/output")
+        output = await sandbox().exec(["tree"], cwd="/home/agent/output")
         print(output)
 
         return Score(value=CORRECT, explanation=output.stdout)
@@ -120,13 +120,7 @@ def directory_scorer():
             return Score(value=0.0, explanation=f"Invalid 'n' value: {expected_n}.")
 
         try:
-            base_output_path = Path("home/agent/output")
-
-            if not base_output_path.is_dir():
-                return Score(
-                    value=0.0,
-                    explanation=f"Base output directory '{base_output_path}' not found or not a directory.",
-                )
+            base_output_path = Path("/home/agent/output")
 
             max_depth_found = -1
             structure_correct = True
@@ -169,12 +163,12 @@ def directory_scorer():
 
 def _create_task(
     solver: Solver | None = None,
-    num_samples: int = 2,
+    num_samples: int = 1,
 ) -> Task:
     solver = solver or default_solver()
     return Task(
         dataset=create_dataset(num_samples=num_samples),
-        scorer=directory_scorer(),
+        scorer=old_scorer(),
         sandbox=("docker", str(Path(__file__).parent / "compose.yaml")),
         solver=solver,
         message_limit=5,

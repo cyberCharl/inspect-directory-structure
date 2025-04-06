@@ -4,7 +4,7 @@ FROM ubuntu:24.04
 
 # install apt packages
 RUN apt-get update -y && apt-get upgrade -y
-RUN apt-get install -y python3 python3-pip python3-dev python3-venv curl lsof
+RUN apt-get install -y python3 python3-pip python3-dev python3-venv curl lsof tree
 
 # set up virtual environment
 ENV VIRTUAL_ENV=/opt/venv
