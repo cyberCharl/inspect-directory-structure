@@ -78,7 +78,7 @@ def create_directory_sample(n: int) -> Sample:
 
 def create_dataset(num_samples: int) -> list[Sample]:
     samples = []
-    for i in range(3, num_samples + 3):
+    for i in range(1, num_samples + 1):
         samples.append(create_directory_sample(i))
 
     return samples
@@ -114,8 +114,8 @@ def old_scorer():
 
 def calculate_expected_dirs(n):
     """Calculates the total expected number of directories for depth n."""
-    if n == 0:
-        return 1  # Just the root '.'
+    if n < 0:
+        return 0  # Just the root '.'
     # Sum of n^k for k from 0 to n (inclusive)
     # Root (n^0=1) + level 1 (n^1=n) + level 2 (n^2) + ... + level n (n^n)
     # No, the structure is: root + n dirs at level 1 + n*n dirs at level 2... + n*n...*n (n times) at level n
@@ -281,9 +281,9 @@ def directory_tree_scorer():
                     print(f"DEBUG Line {i}: Skipping line with depth <= 0")
                     continue
 
+                max_depth_found = max(max_depth_found, current_depth)
                 processed_lines_count += 1
 
-                # === FIX 3: Restore logic to find parent and populate structures ===
                 parent_depth = current_depth - 1
                 parent_id = depth_stack.get(parent_depth)
                 if parent_id is None:
@@ -309,7 +309,6 @@ def directory_tree_scorer():
                 keys_to_remove = [d for d in depth_stack if d > current_depth]
                 for d in keys_to_remove:
                     del depth_stack[d]
-                # === End of FIX 3 ===
 
             print("--- DEBUG: Parsing Complete ---")
             print(f"DEBUG: Final max_depth_found determined by loop: {max_depth_found}")
@@ -388,7 +387,7 @@ def directory_tree_scorer():
 
 def _create_task(
     solver: Solver | None = None,
-    num_samples: int = 1,
+    num_samples: int = 3,
 ) -> Task:
     solver = solver or default_solver()
     return Task(
