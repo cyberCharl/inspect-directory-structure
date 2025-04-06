@@ -243,26 +243,20 @@ def directory_tree_scorer():
                 r"^([|`\- \t]*)(\S.*)$"
             )  # ASCII-safe prefix, then name
 
-            print(f"\n--- DEBUG: Parsing Tree (expecting n={expected_n}) ---")
-
             processed_lines_count = 0  # Count actual directory lines parsed
-            for i, line in enumerate(lines):
+            for line in lines:
                 line = line.rstrip()
-                print(f"DEBUG Line {i}: Raw='{line}'")
 
                 # Skip empty lines
                 if not line:
-                    print(f"DEBUG Line {i}: Skipping empty line.")
                     continue
 
                 # Skip root indicator and summary line explicitly
                 if line == "." or "directories" in line or "files" in line:
-                    print(f"DEBUG Line {i}: Skipping (root/summary)")
                     continue
 
                 match = line_regex.match(line)
                 if not match:
-                    print(f"DEBUG Line {i}: !!! REGEX FAILED !!!")
                     continue  # Skip lines that don't match the expected format
 
                 prefix = match.group(1)
@@ -273,12 +267,7 @@ def directory_tree_scorer():
                     name_start_index // 4
                 )  # Standard tree indent calculation
 
-                print(
-                    f"DEBUG Line {i}: Prefix='{prefix}' (len={len(prefix)}), Name='{name}', Index={name_start_index}, Calculated Depth={current_depth}"
-                )
-
                 if current_depth <= 0:  # Should only be '.' which is skipped above
-                    print(f"DEBUG Line {i}: Skipping line with depth <= 0")
                     continue
 
                 max_depth_found = max(max_depth_found, current_depth)
@@ -310,9 +299,6 @@ def directory_tree_scorer():
                 for d in keys_to_remove:
                     del depth_stack[d]
 
-            print("--- DEBUG: Parsing Complete ---")
-            print(f"DEBUG: Final max_depth_found determined by loop: {max_depth_found}")
-            print(f"DEBUG: Total directory lines processed: {processed_lines_count}")
             # Compare parsed lines count (+1 for root) with reported count
             # The root '.' isn't processed in the loop, so add 1
             actual_dirs_parsed = processed_lines_count + 1
@@ -387,7 +373,7 @@ def directory_tree_scorer():
 
 def _create_task(
     solver: Solver | None = None,
-    num_samples: int = 3,
+    num_samples: int = 5,
 ) -> Task:
     solver = solver or default_solver()
     return Task(
