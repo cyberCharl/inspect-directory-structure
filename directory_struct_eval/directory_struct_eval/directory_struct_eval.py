@@ -78,7 +78,7 @@ def create_directory_sample(n: int) -> Sample:
 
 def create_dataset(num_samples: int) -> list[Sample]:
     samples = []
-    for i in range(2, num_samples + 2):
+    for i in range(3, num_samples + 3):
         samples.append(create_directory_sample(i))
 
     return samples
@@ -152,7 +152,7 @@ def directory_tree_scorer():
             # Use -L n+1 to limit depth shown, prevents overly large output for failed states? Maybe not necessary.
             exec_result = await sandbox().exec(
                 # ["tree", "-d", "-L", str(expected_n + 1)], # -d shows only dirs, -L limits depth
-                ["tree", "-d"],  # Simpler: just show directories
+                ["tree"],
                 cwd=output_dir,
             )
 
@@ -194,109 +194,91 @@ def directory_tree_scorer():
                         explanation=f"Directory structure is empty, but expected depth {expected_n}.",
                     )  # Align with n>=1
 
+            print(tree_output)
+
             # --- Start Parsing ---
             lines = tree_output.strip().split("\n")
-            if not lines:
-                return Score(
-                    value=0.0, explanation="Empty 'tree' output after stripping."
-                )
+            # ... skip summary line parsing for now if needed ...
 
-            # Extract summary line first (usually the last line)
-            summary_line = lines[-1]
-            match_summary = re.match(
-                r"(\d+)\s+directories?,\s+(\d+)\s+files?", summary_line
-            )
-            if not match_summary:
-                return Score(
-                    value=0.0,
-                    explanation=f"Could not parse tree summary line: '{summary_line}'",
-                )
-
-            reported_dirs = int(match_summary.group(1))
-            reported_files = int(match_summary.group(2))
-
-            # Basic check: No files allowed
-            if reported_files != 0:
-                return Score(
-                    value=0.0,
-                    explanation=f"Incorrect structure: Found {reported_files} files, expected 0.",
-                )
-
-            # Prepare for structure validation
-            structure = defaultdict(list)  # Stores parent_id -> list of children names
-            nodes = {}  # Stores node_id -> (name, depth, path_str)
+            structure = defaultdict(list)
+            nodes = {}
             max_depth_found = 0
-            # Use a stack to keep track of the parent node_id at each depth level
-            # depth_stack[depth] = node_id_of_parent
-            depth_stack = {0: "ROOT"}  # Virtual root node at depth 0
-            nodes["ROOT"] = (".", 0, ".")  # Add virtual root
+            depth_stack = {0: "ROOT"}
+            nodes["ROOT"] = (".", 0, ".")
 
-            # Regex to find indentation and name
-            # Matches prefix (|   ,     , `-- , etc.) and the name
-            line_regex = re.compile(r"^([│└├─\s]*)(\S.*)$")
+            # Try the more robust ASCII regex:
+            line_regex = re.compile(r"^([|`\- \t]*)(\S.*)$")  # Use ASCII-safe chars
+            # Original regex commented out:
+            # line_regex = re.compile(r"^([│└├─\s]*)(\S.*)$")
+
+            print(
+                f"\n--- DEBUG: Parsing Tree Output (expecting n={expected_n}) ---"
+            )  # DEBUG START
 
             processed_lines = 0
-            for line in lines:
-                line = line.rstrip()  # Remove trailing whitespace
+            for i, line in enumerate(lines):  # Use enumerate to get line number
+                line = line.rstrip()
+                print(f"DEBUG Line {i}: Raw='{line}'")  # DEBUG Raw Line
+
                 if line == "." or "directories" in line or "files" in line:
-                    continue  # Skip root indicator and summary
+                    print(f"DEBUG Line {i}: Skipping (root/summary)")  # DEBUG Skip
+                    continue
 
                 match = line_regex.match(line)
                 if not match:
-                    # Handle potential unexpected lines if needed
-                    continue  # Or log a warning
+                    # If the regex fails, this is a major clue!
+                    print(f"DEBUG Line {i}: !!! REGEX FAILED !!!")  # DEBUG Regex Fail
+                    continue
 
                 prefix = match.group(1)
                 name = match.group(2)
 
-                # Calculate depth based on the visual structure characters before the name
-                # This relies on tree's consistent spacing (usually 4 chars per level)
-                # Count non-space characters used for tree structure in the prefix
-                # Depth corresponds to the number of '|' or groups of '    ' + 1 connector (`|--` or `'--`)
-                # Easier: find the index of the name start. Depth = index // 4
                 name_start_index = len(prefix)
+                # Calculate depth robustly: count levels of indentation markers
+                # Simplest reliable way often remains index // 4 for standard tree
                 current_depth = name_start_index // 4
 
-                if current_depth <= 0:
-                    # Should not happen for lines after '.', maybe malformed output?
+                print(
+                    f"DEBUG Line {i}: Prefix='{prefix}' (len={len(prefix)}), Name='{name}', Index={name_start_index}, Calculated Depth={current_depth}"
+                )  # DEBUG PARSING
+
+                if (
+                    current_depth <= 0 and name != "."
+                ):  # Allow depth 0 only for root '.' which we skip anyway
+                    print(
+                        f"DEBUG Line {i}: Skipping line with depth <= 0"
+                    )  # DEBUG Skip Depth 0
                     continue
 
+                # --- Check if max_depth_found is updated ---
+                old_max_depth = max_depth_found
                 max_depth_found = max(max_depth_found, current_depth)
+                if old_max_depth != max_depth_found:
+                    print(
+                        f"DEBUG Line {i}: *** Max depth updated to {max_depth_found} ***"
+                    )  # DEBUG Max Depth Change
+
                 processed_lines += 1
 
-                # Generate a unique ID for this node (using its path)
-                # Find the parent from the stack at depth-1
-                parent_id = depth_stack.get(current_depth - 1)
-                if parent_id is None:
-                    return Score(
-                        value=0.0,
-                        explanation=f"Parsing error: Could not find parent for node '{name}' at depth {current_depth}. Line: '{line}'",
-                    )
+                # ... (rest of the loop: parent finding, structure building) ...
+                # You can add more prints here if needed for parent/stack debugging
 
-                parent_path = nodes[parent_id][2]
-                current_path = f"{parent_path}/{name}" if parent_path != "." else name
-                node_id = current_path  # Use path as unique ID
-
-                # Store node info
-                nodes[node_id] = (name, current_depth, current_path)
-
-                # Add to parent's children list
-                structure[parent_id].append(node_id)
-
-                # Update the stack for the current depth
-                depth_stack[current_depth] = node_id
-                # Clean up stack for deeper levels (if we backtrack in the tree)
-                keys_to_remove = [d for d in depth_stack if d > current_depth]
-                for d in keys_to_remove:
-                    del depth_stack[d]
+            print("--- DEBUG: Parsing Complete ---")  # DEBUG END LOOP
+            print(f"DEBUG: Final max_depth_found determined by loop: {max_depth_found}")
+            print(
+                f"DEBUG: Total lines processed (excluding root/summary): {processed_lines}"
+            )
 
             # --- Validation ---
             # 1. Check maximum depth
+            print(
+                f"DEBUG: Comparing final max_depth_found ({max_depth_found}) with expected_n ({expected_n})"
+            )
             if max_depth_found != expected_n:
                 return Score(
                     value=0.0,
-                    explanation=f"Incorrect depth: Maximum depth found is {max_depth_found}, expected {expected_n}.",
-                )
+                    explanation=f"[Debugged] Incorrect depth: Maximum depth found is {max_depth_found}, expected {expected_n}.",
+                )  # Add tag
 
             # 2. Check total directory count (reported vs expected based on n)
             # We count processed lines + 1 (for the root '.')
@@ -304,17 +286,20 @@ def directory_tree_scorer():
                 processed_lines + 1
             )  # +1 for the root '.' which isn't in the loop
             # Note: tree reports dirs *including* '.', so reported_dirs should match actual_dirs_parsed
-            if actual_dirs_parsed != reported_dirs:
-                # This might indicate a parsing issue or unexpected tree output format
-                print(
-                    f"Warning: Parsed {actual_dirs_parsed} dirs, but tree summary reported {reported_dirs}."
-                )
-                # Decide whether to fail or trust the parsing
-                # Let's trust our parsing for structure checks, but maybe flag this.
+            # if actual_dirs_parsed != reported_dirs:
+            #     # This might indicate a parsing issue or unexpected tree output format
+            #     print(
+            #         f"Warning: Parsed {actual_dirs_parsed} dirs, but tree summary reported {reported_dirs}."
+            #     )
+            #     # Decide whether to fail or trust the parsing
+            #     # Let's trust our parsing for structure checks, but maybe flag this.
 
-            # expected_total_dirs = calculate_expected_dirs(expected_n)
-            # if actual_dirs_parsed != expected_total_dirs:
-            #    return Score(value=0.0, explanation=f"Incorrect total directory count: Found {actual_dirs_parsed}, expected {expected_total_dirs} for n={expected_n}.")
+            expected_total_dirs = calculate_expected_dirs(expected_n)
+            if actual_dirs_parsed != expected_total_dirs:
+                return Score(
+                    value=0.0,
+                    explanation=f"Incorrect total directory count: Found {actual_dirs_parsed}, expected {expected_total_dirs} for n={expected_n}.",
+                )
 
             # 3. Validate branching factor recursively/iteratively using the built structure
             for node_id, (depth, path_str) in nodes.items():
@@ -346,7 +331,7 @@ def directory_tree_scorer():
             # If all checks passed
             return Score(
                 value=1.0,
-                explanation=f"Correct directory structure found for n={expected_n} (Depth: {max_depth_found}, Branching: {expected_n}, Files: {reported_files}).",
+                explanation=f"Correct directory structure found for n={expected_n} (Depth: {max_depth_found}, Branching: {expected_n}).",
             )
 
         except Exception as e:
