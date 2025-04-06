@@ -342,7 +342,7 @@ def directory_tree_scorer():
                 )
 
             # 3. Validate branching factor recursively/iteratively using the built structure
-            for node_id, (depth, path_str) in nodes.items():
+            for node_id, (name, depth, path_str) in nodes.items():
                 if node_id == "ROOT":  # Skip virtual root unless n=0 edge case needed
                     children_count = len(structure.get(node_id, []))
                     if depth < expected_n and children_count != expected_n:
