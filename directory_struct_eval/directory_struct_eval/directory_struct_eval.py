@@ -12,8 +12,6 @@ from dotenv import load_dotenv
 from inspect_ai import Task, task
 from inspect_ai.dataset import Sample
 from inspect_ai.scorer import (
-    CORRECT,
-    # INCORRECT,
     Score,
     Target,
     accuracy,
@@ -30,7 +28,7 @@ from inspect_ai.tool import (
 )
 from inspect_ai.util import sandbox
 
-NEW_PROMPT = """Your objective is to generate a nested directory hierarchy according to the rules specified below.
+AGENT_PROMPT = """Your objective is to generate a nested directory hierarchy according to the rules specified below.
 
 **Core Requirements:**
 
@@ -62,8 +60,6 @@ The expected structure within `/home/agent/output/`:
     ├── e/  (Created first within 'd/' at depth 2, empty)
     └── f/  (Created second within 'd/' at depth 2, empty)"""
 
-agent = basic_agent(tools=[bash()])
-
 load_dotenv()
 
 
@@ -72,7 +68,7 @@ def hash_string(data: str) -> str:
 
 
 def create_directory_sample(n: int) -> Sample:
-    prompt = NEW_PROMPT.format(n=n)
+    prompt = AGENT_PROMPT.format(n=n)
     return Sample(id=hash_string(prompt), input=prompt, target=str(n))
 
 
@@ -91,25 +87,6 @@ def default_solver() -> Solver:
         # the submit_description field can be used to provide a hint to the solver about what the expected output format is
         submit_description="Submit an answer for evaluation.",
     )
-
-
-@scorer(metrics=[accuracy()])
-def old_scorer():
-    async def score(state: TaskState, target: Target) -> Score:
-        # There are predefined scorers in inspect_ai.scorer which might be more appropriate for this task, but we define a custom one here for illustrative purposes. In practice, you would want to use something like inspect's built-in `exact()` scorer which does this plus some extra normalization.
-
-        # if state.output.completion.strip() == target.text:
-        #     return Score(value=CORRECT, explanation="Answer is correct.")
-        # return Score(
-        #     value=INCORRECT,
-        #     explanation=f"Expected answer {target.text}, got {state.output.completion}",
-        # )
-        output = await sandbox().exec(["tree"], cwd="/home/agent/output")
-        print(output)
-
-        return Score(value=CORRECT, explanation=output.stdout)
-
-    return score
 
 
 def calculate_expected_dirs(n):
@@ -199,10 +176,6 @@ def directory_tree_scorer():
                             explanation=f"Directory structure appears empty or invalid, expected depth {expected_n}.",
                         )
                 # If not empty, proceed with parsing
-
-            print("--- Tree Output ---")
-            print(tree_output)
-            print("-------------------")
 
             # --- Start Parsing ---
             lines = tree_output.strip().split("\n")
@@ -309,9 +282,6 @@ def directory_tree_scorer():
 
             # --- Validation ---
             # 1. Check maximum depth
-            print(
-                f"DEBUG: Comparing final max_depth_found ({max_depth_found}) with expected_n ({expected_n})"
-            )
             if max_depth_found != expected_n:
                 return Score(
                     value=0.0,
